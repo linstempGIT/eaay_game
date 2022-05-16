@@ -18,9 +18,9 @@ class Ship():
         self.rect = self.image.get_rect()
         self.screen_rect = screen.get_rect()
 
-        # 将每艘新飞船放在屏幕底部中央
-        self.rect.centerx = self.screen_rect.centerx
-        self.rect.bottom = (self.screen_rect.centery * 3) // 2
+        # 将每艘新飞船放在屏幕中央
+        self.rect.centerx = self.ai_settings.ship_centerx
+        self.rect.bottom = self.ai_settings.ship_bottom
 
         # 在飞船的属性center, bottom中存储小数值
         self.center = float(self.rect.centerx)
@@ -42,6 +42,8 @@ class Ship():
         self.fire_prepare = 100
 
     def fire(self):
+        '''飞船开火发射子弹功能的实现'''
+        
         self.fire_prepare += 1
         if self.fire_button == True and\
         self.fire_prepare >= self.ai_settings.ship_fire_wait_time and\
@@ -53,6 +55,7 @@ class Ship():
             self.fire_prepare = 0
 
     def update(self):
+
         '''根据移动标志调整飞船的位置'''
         if self.moving_right and self.rect.right < self.screen_rect.right:
             self.center += self.ai_settings.ship_x_speed
@@ -66,6 +69,19 @@ class Ship():
         # 根据self.center更新rect对象
         self.rect.centerx = self.center
         self.rect.bottom = self.bottom
+
+    def reset_ship(self, stats_game_active):
+        '''飞船被撞毁后重置'''
+
+        if stats_game_active == True:
+            self.center = self.screen_rect.centerx
+            self.bottom = self.screen_rect.bottom
+            self.total_bullets = 300
+        else:
+            self.bullets.empty()
+            self.total_bullets = 300
+            self.center = self.ai_settings.ship_centerx
+            self.bottom = self.ai_settings.ship_bottom
 
     def blitme(self):
 
