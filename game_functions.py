@@ -3,7 +3,7 @@ import pygame
 from ufo import Ufo
 from time import sleep
 
-def check_keydowm_events(event, ai_settings, stats, screen, ship, ufos):
+def check_keydowm_events(event, screen, ai_settings, stats, ship, ufos):
     '''响应按下按键'''
 
     global ship_fire_define
@@ -55,7 +55,7 @@ def check_play_button(ai_settings, screen, stats, play_button,
         restart(ai_settings, stats, screen, ship, ufos)
 
 
-def check_events(ai_settings, screen, stats, play_button, ship, ufos):
+def check_events(screen, ai_settings, play_button, stats, ship, ufos):
     '''响应按键和鼠标事件'''
 
     # 监视事件, 如果退出则关闭窗口循环
@@ -63,7 +63,7 @@ def check_events(ai_settings, screen, stats, play_button, ship, ufos):
         if event.type == pygame.QUIT:
             sys.exit()
         elif event.type == pygame.KEYDOWN:
-            check_keydowm_events(event, ai_settings, stats, screen, ship, ufos)
+            check_keydowm_events(event, screen, ai_settings, stats, ship, ufos)
         elif event.type == pygame.KEYUP:
             check_keyup_events(event, ship)
         elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -71,7 +71,7 @@ def check_events(ai_settings, screen, stats, play_button, ship, ufos):
             check_play_button(ai_settings, screen, stats, play_button,
                                 ship, ufos, mouse_x, mouse_y)
 
-def update_screen(ai_settings, stats, screen, ship, ufos, play_button):
+def update_screen(screen, ai_settings, play_button, stats, ship, ufos, scb, shb):
     '''更新屏幕上的图像, 并切换到新屏幕'''
 
     # 每次循环时都重绘screen
@@ -87,15 +87,11 @@ def update_screen(ai_settings, stats, screen, ship, ufos, play_button):
     # 每次循环进行ufos重绘
     ufos.draw(screen)
 
-    # 每次循环显示剩余子弹数量
-    print_remain_bullets(screen, ship)
-
-    # 每次循环显示剩余可用飞船
-    print_remain_ship(screen, stats)
+    # 每次循环跟新游戏信息
+    show_information(stats, ship, scb, shb)
 
     # 如果游戏处于非活动状态，就绘制Play按钮
     if not stats.game_active:
-        gameover_score(stats, screen)
         play_button.draw_button()
     
     # 在屏幕上更新screen(surface对象)内容
@@ -125,18 +121,24 @@ def process_collision(ai_settings, stats, screen, ship, ufos):
         groupcollide(ship.bullets,ufos, True, True)
 
      # 游戏击中ufo得分
-    stats.score += len(collisions)
+    if collisions:
+        for ufos in collisions.values():
+            stats.score += ai_settings.ufo_points * len(ufos)
 
-    # 如果所有飞船被击中
+    # 如果所有ufo被击中
     if len(ufos) == 0:
         # 删除现有的子弹，并对ufos重生
-        # ship.bullets.empty()
-        create_fleet(ai_settings, screen, ufos)
+        ship.bullets.empty()
+        create_fleet(screen, ai_settings, ufos)
+        # 提升游戏难度
+        ai_settings.increase_dificult()
+        # 游戏等级提升
+        stats.level += 1
 
     # 检测ufo和飞船是否碰撞
     if pygame.sprite.spritecollideany(ship, ufos):
-        if stats.ships_left > 0:
-            # 如果碰撞且飞船数大于零开始下一艘飞船
+        if ship.remain_ships > 0:
+            # 如果碰撞且飞船备用数大于零开始下一艘飞船
             restart(ai_settings, stats, screen, ship, ufos)
         else:
             # 游戏结束
@@ -156,12 +158,28 @@ def print_remain_bullets(screen, ship):
     screen.blit(font.render(str(ship.total_bullets),
     True, [255, 0, 0]), [5, 5])
 
-def print_remain_ship(screen, stats):
+def show_information(stats, ship, scb, shb):
+    '''显示游戏中的相关信息'''
+
+    # 检查最高分数是否更新
+    check_hight_score(stats)
+
+    # 更新计分榜可变信息
+    scb.update(stats)
+
+    # 更新飞船信息栏
+    shb.update(ship)
+
+    # 显示游戏信息
+    scb.show_score()
+    shb.show_ship_infos()
+
+"""def print_remain_ship(screen, stats):
     '''显示剩余可用的飞船'''
     
     font = pygame.font.SysFont('Times', 10)
     screen.blit(font.render(str(stats.ships_left),
-    True, [255, 0, 0]), [1185, 5])
+    True, [255, 0, 0]), [1185, 5])"""
 
 def get_number_ufos_x(ai_settings):
     '''计算每行能容纳下多少个ufo'''
@@ -181,14 +199,14 @@ def get_number_rows(ai_settings):
 def create_ufo(ai_settings, screen, ufos, ufo_number, row_number):
     '''创建一个ufo并将其放入行编组ufos'''
 
-    ufo = Ufo(ai_settings, screen)
+    ufo = Ufo(screen, ai_settings)
     ufo_width = ufo.rect.width
     ufo.x = ufo_width + 2 * ufo_width * ufo_number
     ufo.rect.x = ufo.x
     ufo.rect.y = ufo.rect.height + 4 * ufo.rect.height * row_number
     ufos.add(ufo)
 
-def create_fleet(ai_settings, screen, ufos):
+def create_fleet(screen, ai_settings, ufos):
     '''创建ufo舰队'''
 
     # creat_fleet只对外部已存在的Goup进行重新编排
@@ -229,7 +247,7 @@ def check_ufos_bottom(ai_settings, stats, screen, ship, ufos):
     screen_rect = screen.get_rect()
     for ufo in ufos.sprites():
         if ufo.rect.bottom >= screen_rect.bottom:
-            if stats.ships_left > 0:
+            if ship.remain_ships > 0:
                 restart(ai_settings, stats, screen, ship, ufos)
                 break
             else:
@@ -244,13 +262,13 @@ def flash_screen(screen):
     pygame.display.flip()
     sleep(0.5)
 
-def gameover_score(stats, screen):
+"""def gameover_score(stats, screen):
     '''游戏结束打印结算分数'''
 
     font = pygame.font.SysFont('Times', 30)
     x = 600 - 15 * len(str(stats.score))
     screen.blit(font.render(str(stats.score),
-    True, [255, 0, 0]), [x, 300])
+    True, [255, 0, 0]), [x, 300])"""
 
 def restart(ai_settings, stats, screen, ship, ufos):
     '''如果激活状态为假重开游戏，否则启用下一艘飞船'''
@@ -260,20 +278,32 @@ def restart(ai_settings, stats, screen, ship, ufos):
         # 屏幕暂时黑屏
         flash_screen(screen)
         # 将ship_left减1
-        stats.ships_left -= 1
+        ship.remain_ships -= 1
         # 清空ufos，创建一群新的ufo舰队
         ufos.empty()
-        create_fleet(ai_settings, screen, ufos)
+        create_fleet(screen, ai_settings, ufos)
         # 将飞船重置
-        ship.reset_ship(True)# 创建新ufo舰队，重置飞船
+        ship.reset_ship(True)
     #重开游戏
-    else:    
+    else:
+        # 重置settings的改变量
+        ai_settings.reset()
+        
+        # 创建新ufo舰队，重置飞船    
         ufos.empty()
-        create_fleet(ai_settings, screen, ufos)
+        create_fleet(screen, ai_settings, ufos)
         ship.reset_ship(False)
 
         # 重置游戏统计信息
         stats.reset_stats()
         stats.game_active = True
 
-    
+def check_hight_score(stats):
+    '''检查是否诞生了新的最高得分'''
+
+    if stats.score > stats.highest_score:
+        # 先对最高分数进行更新
+        stats.highest_score = stats.score
+        # 再对最高分数进行存储
+        stats.store_highest_score()
+

@@ -3,7 +3,7 @@ from os.path import dirname
 from bullet import Bullet
 from pygame.sprite import Group
 
-dir_name = dirname(__file__)
+dir_name = dirname(__file__) + '/sources/images/'
 
 class Ship():
 
@@ -13,8 +13,7 @@ class Ship():
         self.ai_settings = ai_settings
 
         # 加载飞船图形并获取其外接矩形
-        self.image = pygame.image.load(dir_name
-        +'/images/ship.bmp')
+        self.image = pygame.image.load(dir_name + 'ship.bmp')
         self.rect = self.image.get_rect()
         self.screen_rect = screen.get_rect()
 
@@ -38,15 +37,20 @@ class Ship():
         self.bullets = Group()
         # 开火标志
         self.fire_button = False
+        # 开火冷却需要时间
+        self.fire_wait_time = ai_settings.ship_fire_wait_time
         # 开火准备
-        self.fire_prepare = 100
+        self.fire_prepare = ai_settings.ship_fire_wait_time
+
+        # 备用飞船数
+        self.remain_ships = ai_settings.ship_limit
 
     def fire(self):
         '''飞船开火发射子弹功能的实现'''
         
         self.fire_prepare += 1
         if self.fire_button == True and\
-        self.fire_prepare >= self.ai_settings.ship_fire_wait_time and\
+        self.fire_prepare >= self.fire_wait_time and\
         self.total_bullets > 0:
             # 创建一个子弹, 并将其加入到编组bullets中
             new_bullet = Bullet(self.screen, self.ai_settings, self)
@@ -74,11 +78,14 @@ class Ship():
         '''飞船被撞毁后重置'''
 
         if stats_game_active == True:
+            # 还有剩余可用飞船，在屏幕中底部生成，重装子弹
             self.center = self.screen_rect.centerx
             self.bottom = self.screen_rect.bottom
             self.total_bullets = 300
         else:
+            # 飞船用尽，重置为游戏开始时飞船状态
             self.bullets.empty()
+            self.remain_ships = self.ai_settings.ship_limit
             self.total_bullets = 300
             self.center = self.ai_settings.ship_centerx
             self.bottom = self.ai_settings.ship_bottom
